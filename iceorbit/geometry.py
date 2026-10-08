@@ -1,4 +1,4 @@
-"""Cage geometry: vertex coordinates and the undirected hydrogen-bond graph."""
+"""Geometry: vertex coordinates and the undirected hydrogen-bond graph."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 
 
 @dataclass(frozen=True)
-class Cage:
-    """A 3-regular cage graph embedded in 3D.
+class HBGraph:
+    """A 3-regular hydrogen-bond graph embedded in 3D.
 
     `edges[e] = (u, v)` with `u < v`; edges are sorted lexicographically.
     Bit `e` of a configuration is 0 when `u` donates to `v`, 1 when `v` donates to `u`.
@@ -55,20 +55,20 @@ def edges_by_distance(coords: np.ndarray, cutoff: float | None = None) -> np.nda
     return edges[np.lexsort((edges[:, 1], edges[:, 0]))]
 
 
-def make_cage(coords: np.ndarray, edges: np.ndarray | None = None, cutoff: float | None = None) -> Cage:
+def make_graph(coords: np.ndarray, edges: np.ndarray | None = None, cutoff: float | None = None) -> HBGraph:
     coords = np.asarray(coords, dtype=float)
     if edges is None:
         edges = edges_by_distance(coords, cutoff)
     edges = np.sort(np.asarray(edges, dtype=np.int64), axis=1)
     edges = edges[np.lexsort((edges[:, 1], edges[:, 0]))]
-    cage = Cage(coords=coords, edges=edges)
-    deg = np.bincount(edges.ravel(), minlength=cage.n_vertices)
+    graph = HBGraph(coords=coords, edges=edges)
+    deg = np.bincount(edges.ravel(), minlength=graph.n_vertices)
     if not np.all(deg == 3):
         bad = np.nonzero(deg != 3)[0]
-        raise ValueError(f"cage must be 3-regular; vertices with wrong degree: {bad.tolist()} (deg={deg[bad].tolist()})")
-    if cage.n_edges > 64:
-        raise ValueError(f"at most 64 edges are supported (got {cage.n_edges})")
-    return cage
+        raise ValueError(f"graph must be 3-regular; vertices with wrong degree: {bad.tolist()} (deg={deg[bad].tolist()})")
+    if graph.n_edges > 64:
+        raise ValueError(f"at most 64 edges are supported (got {graph.n_edges})")
+    return graph
 
 
 def dodecahedron_coords() -> np.ndarray:
@@ -92,12 +92,12 @@ BUILTIN = {
 }
 
 
-def builtin_cage(name: str = "dodecahedron") -> Cage:
+def builtin_graph(name: str = "dodecahedron") -> HBGraph:
     try:
         coords = BUILTIN[name]()
     except KeyError:
-        raise ValueError(f"unknown builtin cage {name!r}; choose from {sorted(BUILTIN)}") from None
-    return make_cage(coords)
+        raise ValueError(f"unknown builtin graph {name!r}; choose from {sorted(BUILTIN)}") from None
+    return make_graph(coords)
 
 
 def read_xyz(path: str | Path) -> np.ndarray:
@@ -117,5 +117,5 @@ def read_xyz(path: str | Path) -> np.ndarray:
     return np.array(coords)
 
 
-def cage_from_xyz(path: str | Path, cutoff: float | None = None) -> Cage:
-    return make_cage(read_xyz(path), cutoff=cutoff)
+def graph_from_xyz(path: str | Path, cutoff: float | None = None) -> HBGraph:
+    return make_graph(read_xyz(path), cutoff=cutoff)

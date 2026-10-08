@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from iceorbit import automorphism_group, builtin_cage, classify, enumerate_ice_configs
+from iceorbit import automorphism_group, builtin_graph, classify, enumerate_ice_configs
 from iceorbit.polarization import (
     ZERO_TOL,
     bond_directions,
@@ -13,35 +13,35 @@ from iceorbit.polarization import (
 
 @pytest.fixture(scope="module")
 def dodeca():
-    cage = builtin_cage("dodecahedron")
-    configs = enumerate_ice_configs(cage)
-    res = classify(configs, automorphism_group(cage))
-    mag = np.linalg.norm(polarization(configs, cage), axis=1)
-    return cage, configs, res, mag
+    graph = builtin_graph("dodecahedron")
+    configs = enumerate_ice_configs(graph)
+    res = classify(configs, automorphism_group(graph))
+    mag = np.linalg.norm(polarization(configs, graph), axis=1)
+    return graph, configs, res, mag
 
 
 @pytest.mark.parametrize("name", ["dodecahedron", "cube"])
 def test_outer_bond_is_radial_for_regular_polyhedra(name):
-    cage = builtin_cage(name)
-    _, outer = bond_directions(cage)
-    radial = cage.coords / np.linalg.norm(cage.coords, axis=1, keepdims=True)
+    graph = builtin_graph(name)
+    _, outer = bond_directions(graph)
+    radial = graph.coords / np.linalg.norm(graph.coords, axis=1, keepdims=True)
     assert np.allclose(outer, radial)
 
 
 def test_cube_linear_form_matches_direct():
-    cage = builtin_cage("cube")
-    configs = enumerate_ice_configs(cage)
-    p = polarization(configs, cage)
-    want = np.array([polarization_direct(int(x), cage) for x in configs])
+    graph = builtin_graph("cube")
+    configs = enumerate_ice_configs(graph)
+    p = polarization(configs, graph)
+    want = np.array([polarization_direct(int(x), graph) for x in configs])
     assert np.allclose(p, want)
 
 
 def test_dodecahedron_linear_form_matches_direct(dodeca):
-    cage, configs, _, _ = dodeca
+    graph, configs, _, _ = dodeca
     rng = np.random.default_rng(0)
     idx = rng.choice(len(configs), 200, replace=False)
-    p = polarization(configs[idx], cage)
-    want = np.array([polarization_direct(int(configs[i]), cage) for i in idx])
+    p = polarization(configs[idx], graph)
+    want = np.array([polarization_direct(int(configs[i]), graph) for i in idx])
     assert np.allclose(p, want)
 
 

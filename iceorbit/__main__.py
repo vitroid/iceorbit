@@ -3,7 +3,7 @@
 Examples:
     python -m iceorbit                         # built-in 5^12 dodecahedron, full group (Ih)
     python -m iceorbit --group I               # rotations only (mirror images distinguished)
-    python -m iceorbit --xyz cage.xyz --out results/cage
+    python -m iceorbit --xyz water.xyz --out results/water
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from iceorbit import automorphism_group, builtin_cage, cage_from_xyz, classify, enumerate_ice_configs
+from iceorbit import automorphism_group, builtin_graph, graph_from_xyz, classify, enumerate_ice_configs
 from iceorbit.geometry import BUILTIN
 from iceorbit.plot import plot_magnitude_distribution
 from iceorbit.polarization import ZERO_TOL, magnitude_distribution, polarization
@@ -30,7 +30,7 @@ def bitstring(x: int, n_edges: int) -> str:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     src = p.add_mutually_exclusive_group()
-    src.add_argument("--builtin", choices=sorted(BUILTIN), default="dodecahedron", help="built-in cage")
+    src.add_argument("--builtin", choices=sorted(BUILTIN), default="dodecahedron", help="built-in polyhedron")
     src.add_argument("--xyz", type=Path, help="XYZ file with oxygen positions (H atoms are ignored)")
     p.add_argument("--cutoff", type=float, default=None, help="O-O bond cutoff (default: 1.25 x shortest O-O)")
     p.add_argument(
@@ -43,20 +43,20 @@ def main() -> None:
     args = p.parse_args()
 
     t0 = time.perf_counter()
-    cage = cage_from_xyz(args.xyz, args.cutoff) if args.xyz else builtin_cage(args.builtin)
-    full = automorphism_group(cage)
+    graph = graph_from_xyz(args.xyz, args.cutoff) if args.xyz else builtin_graph(args.builtin)
+    full = automorphism_group(graph)
     group = full if args.group == "Ih" else full.rotations()
     t1 = time.perf_counter()
-    configs = enumerate_ice_configs(cage)
+    configs = enumerate_ice_configs(graph)
     t2 = time.perf_counter()
     res = classify(configs, group)
     t3 = time.perf_counter()
-    mag = np.linalg.norm(polarization(configs, cage), axis=1)
-    rep_mag = np.linalg.norm(polarization(res.representatives, cage), axis=1)
+    mag = np.linalg.norm(polarization(configs, graph), axis=1)
+    rep_mag = np.linalg.norm(polarization(res.representatives, graph), axis=1)
     dist = magnitude_distribution(mag, res.class_id)
     t4 = time.perf_counter()
 
-    print(f"cage: V={cage.n_vertices} E={cage.n_edges}")
+    print(f"graph: V={graph.n_vertices} E={graph.n_edges}")
     print(f"automorphisms: {full.order} (proper {int(full.proper.sum())}); using {args.group}, order {group.order}")
     print(f"ice-rule configurations: {len(configs):,}")
     print(f"symmetry-distinct classes: {res.n_classes:,} (Burnside: {res.burnside_classes():g})")
@@ -97,7 +97,7 @@ def main() -> None:
                     [
                         int(k),
                         rep,
-                        bitstring(rep, cage.n_edges),
+                        bitstring(rep, graph.n_edges),
                         int(res.degeneracy[k]),
                         int(res.stabilizer_order[k]),
                         int(res.stabilizer_improper[k]),
@@ -112,15 +112,15 @@ def main() -> None:
                 w.writerow([f"{v:.9f}", f"{v * v:.9f}", int(n), f"{p:.9g}", int(k)])
         png_path = args.out.with_name(args.out.name + "_polarization.png")
         try:
-            plot_magnitude_distribution(dist, png_path, title=f"V={cage.n_vertices} cage, {len(configs):,} configurations")
+            plot_magnitude_distribution(dist, png_path, title=f"V={graph.n_vertices} graph, {len(configs):,} configurations")
         except ImportError:
             png_path = None
             print("matplotlib is not installed; skipping the histogram")
         npz_path = args.out.with_name(args.out.name + ".npz")
         np.savez_compressed(
             npz_path,
-            coords=cage.coords,
-            edges=cage.edges,
+            coords=graph.coords,
+            edges=graph.edges,
             configs=res.configs,
             class_id=res.class_id,
             representatives=res.representatives,

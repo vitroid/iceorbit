@@ -2,6 +2,8 @@
 name = "iceorbit"
 version = "0.1.0"
 description = "Exhaustive enumeration and symmetry classification of ice-rule hydrogen-bond orientations on 3-regular water networks"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = ["numpy"]
 
@@ -13,7 +15,7 @@ plot = ["matplotlib"]
 iceorbit = "iceorbit.__main__:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

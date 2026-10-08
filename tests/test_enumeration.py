@@ -3,17 +3,17 @@ import itertools
 import numpy as np
 import pytest
 
-from iceorbit import automorphism_group, builtin_cage, cage_from_xyz, classify, enumerate_ice_configs
+from iceorbit import automorphism_group, builtin_graph, graph_from_xyz, classify, enumerate_ice_configs
 from iceorbit.canon import act
 
 
-def brute_force_configs(cage):
-    inc = cage.incident_edges()
+def brute_force_configs(graph):
+    inc = graph.incident_edges()
     out = []
-    for x in range(1 << cage.n_edges):
+    for x in range(1 << graph.n_edges):
         ok = True
         for v, es in enumerate(inc):
-            n_in = sum(((x >> f) & 1) ^ (1 if cage.edges[f, 1] == v else 0) for f in es)
+            n_in = sum(((x >> f) & 1) ^ (1 if graph.edges[f, 1] == v else 0) for f in es)
             if n_in not in (1, 2):
                 ok = False
                 break
@@ -22,11 +22,11 @@ def brute_force_configs(cage):
     return out
 
 
-def act_vertexwise(cage, sigma, x):
+def act_vertexwise(graph, sigma, x):
     """Reference action: move each directed bond (donor, acceptor) by sigma."""
-    index = {(int(u), int(v)): e for e, (u, v) in enumerate(cage.edges)}
+    index = {(int(u), int(v)): e for e, (u, v) in enumerate(graph.edges)}
     y = 0
-    for e, (u, v) in enumerate(cage.edges):
+    for e, (u, v) in enumerate(graph.edges):
         d, a = (u, v) if not (x >> e) & 1 else (v, u)
         d, a = sigma[d], sigma[a]
         e2 = index[(min(d, a), max(d, a))]
@@ -37,23 +37,23 @@ def act_vertexwise(cage, sigma, x):
 
 @pytest.fixture(scope="module")
 def dodeca():
-    cage = builtin_cage("dodecahedron")
-    group = automorphism_group(cage)
-    configs = enumerate_ice_configs(cage)
-    return cage, group, configs
+    graph = builtin_graph("dodecahedron")
+    group = automorphism_group(graph)
+    configs = enumerate_ice_configs(graph)
+    return graph, group, configs
 
 
 def test_cube_matches_brute_force():
-    cage = builtin_cage("cube")
-    group = automorphism_group(cage)
+    graph = builtin_graph("cube")
+    group = automorphism_group(graph)
     assert group.order == 48 and group.proper.sum() == 24
 
-    ref = brute_force_configs(cage)
-    configs = enumerate_ice_configs(cage)
+    ref = brute_force_configs(graph)
+    configs = enumerate_ice_configs(graph)
     assert configs.tolist() == ref
 
     for grp in (group, group.rotations()):
-        orbits = {frozenset(act_vertexwise(cage, s, x) for s in grp.vertex_perm) for x in ref}
+        orbits = {frozenset(act_vertexwise(graph, s, x) for s in grp.vertex_perm) for x in ref}
         res = classify(configs, grp)
         assert res.n_classes == len(orbits)
         assert sorted(res.degeneracy.tolist()) == sorted(len(o) for o in orbits)
@@ -61,8 +61,8 @@ def test_cube_matches_brute_force():
 
 
 def test_dodecahedron_group(dodeca):
-    cage, group, _ = dodeca
-    assert cage.n_vertices == 20 and cage.n_edges == 30
+    graph, group, _ = dodeca
+    assert graph.n_vertices == 20 and graph.n_edges == 30
     assert group.order == 120
     assert group.proper.sum() == 60
     # vertex permutations are distinct and form a group under composition
@@ -73,12 +73,12 @@ def test_dodecahedron_group(dodeca):
 
 
 def test_bit_action_matches_vertex_action(dodeca):
-    cage, group, configs = dodeca
+    graph, group, configs = dodeca
     rng = np.random.default_rng(0)
     sample = configs[rng.choice(len(configs), 50, replace=False)]
     for g in range(0, group.order, 7):
         got = act(group, g, sample).tolist()
-        want = [act_vertexwise(cage, group.vertex_perm[g], int(x)) for x in sample]
+        want = [act_vertexwise(graph, group.vertex_perm[g], int(x)) for x in sample]
         assert got == want
 
 
@@ -102,17 +102,17 @@ def test_dodecahedron_counts(dodeca):
 
 
 def test_xyz_input_with_distortion(tmp_path):
-    ref = builtin_cage("dodecahedron")
+    ref = builtin_graph("dodecahedron")
     rng = np.random.default_rng(1)
     coords = ref.coords * (2.76 / 1.2360679775) + rng.normal(scale=0.05, size=ref.coords.shape)
     lines = [str(2 * len(coords)), "distorted dodecahedron"]
     for x, y, z in coords:
         lines.append(f"O {x:.6f} {y:.6f} {z:.6f}")
         lines.append(f"H {x + 0.5:.6f} {y:.6f} {z:.6f}")
-    path = tmp_path / "cage.xyz"
+    path = tmp_path / "graph.xyz"
     path.write_text("\n".join(lines) + "\n")
 
-    cage = cage_from_xyz(path)
-    assert np.array_equal(cage.edges, ref.edges)
-    group = automorphism_group(cage)
+    graph = graph_from_xyz(path)
+    assert np.array_equal(graph.edges, ref.edges)
+    group = automorphism_group(graph)
     assert group.order == 120 and group.proper.sum() == 60

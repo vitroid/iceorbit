@@ -1,9 +1,9 @@
 """Polarization of a configuration: every hydrogen bond is a unit dipole from donor to acceptor.
 
-Cage edge e=(u, v), u < v, contributes s_e * u_e with u_e the unit vector from u to v and
+Graph edge e=(u, v), u < v, contributes s_e * u_e with u_e the unit vector from u to v and
 s_e = +1 if u donates (bit 0), -1 otherwise. The fourth (outer) bond of vertex v points along
-d_v = -normalize(sum of unit vectors from v to its three cage neighbors); it is donated by v
-(t_v = +1) when v has cage in-degree 2, and accepted (t_v = -1) when the in-degree is 1.
+d_v = -normalize(sum of unit vectors from v to its three graph neighbors); it is donated by v
+(t_v = +1) when v has graph in-degree 2, and accepted (t_v = -1) when the in-degree is 1.
 """
 
 from __future__ import annotations
@@ -12,17 +12,17 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .geometry import Cage
+from .geometry import HBGraph
 
 BYTE = 8
 ZERO_TOL = 1e-8
 ROUND_DECIMALS = 9
 
 
-def bond_directions(cage: Cage) -> tuple[np.ndarray, np.ndarray]:
-    """Unit vectors of cage edges (u -> v) and of the outer bond direction at each vertex."""
-    x = cage.coords
-    u, v = cage.edges[:, 0], cage.edges[:, 1]
+def bond_directions(graph: HBGraph) -> tuple[np.ndarray, np.ndarray]:
+    """Unit vectors of graph edges (u -> v) and of the outer bond direction at each vertex."""
+    x = graph.coords
+    u, v = graph.edges[:, 0], graph.edges[:, 1]
     edge_dir = x[v] - x[u]
     edge_dir /= np.linalg.norm(edge_dir, axis=1, keepdims=True)
 
@@ -31,25 +31,25 @@ def bond_directions(cage: Cage) -> tuple[np.ndarray, np.ndarray]:
     np.add.at(inward, v, -edge_dir)
     norm = np.linalg.norm(inward, axis=1, keepdims=True)
     if np.any(norm < 1e-9):
-        raise ValueError("outer bond direction is undefined at a vertex whose cage bonds sum to zero")
+        raise ValueError("outer bond direction is undefined at a vertex whose graph bonds sum to zero")
     return edge_dir, -inward / norm
 
 
-def linear_form(cage: Cage) -> tuple[np.ndarray, np.ndarray]:
+def linear_form(graph: HBGraph) -> tuple[np.ndarray, np.ndarray]:
     """(c, w) such that P(x) = c + sum_e bit_e(x) * w[e]."""
-    edge_dir, outer = bond_directions(cage)
-    u, v = cage.edges[:, 0], cage.edges[:, 1]
+    edge_dir, outer = bond_directions(graph)
+    u, v = graph.edges[:, 0], graph.edges[:, 1]
     w = -2 * edge_dir + 2 * outer[u] - 2 * outer[v]
-    n_in0 = np.bincount(v, minlength=cage.n_vertices)
+    n_in0 = np.bincount(v, minlength=graph.n_vertices)
     c = edge_dir.sum(axis=0) + ((2 * n_in0 - 3)[:, None] * outer).sum(axis=0)
     return c, w
 
 
-def polarization(configs: np.ndarray, cage: Cage, block: int = 1 << 20) -> np.ndarray:
+def polarization(configs: np.ndarray, graph: HBGraph, block: int = 1 << 20) -> np.ndarray:
     """Polarization vectors (N, 3) of the given configurations, via per-byte lookup tables."""
     configs = np.asarray(configs, dtype=np.uint64)
-    c, w = linear_form(cage)
-    n_e = cage.n_edges
+    c, w = linear_form(graph)
+    n_e = graph.n_edges
     tables = []
     for s in range(0, n_e, BYTE):
         width = min(BYTE, n_e - s)
@@ -69,19 +69,19 @@ def polarization(configs: np.ndarray, cage: Cage, block: int = 1 << 20) -> np.nd
     return out
 
 
-def polarization_direct(config: int, cage: Cage) -> np.ndarray:
+def polarization_direct(config: int, graph: HBGraph) -> np.ndarray:
     """Reference implementation summing bond dipoles one by one."""
-    edge_dir, outer = bond_directions(cage)
+    edge_dir, outer = bond_directions(graph)
     p = np.zeros(3)
-    n_in = np.zeros(cage.n_vertices, dtype=int)
-    for e, (u, v) in enumerate(cage.edges):
+    n_in = np.zeros(graph.n_vertices, dtype=int)
+    for e, (u, v) in enumerate(graph.edges):
         if (config >> e) & 1:
             p -= edge_dir[e]
             n_in[u] += 1
         else:
             p += edge_dir[e]
             n_in[v] += 1
-    for v in range(cage.n_vertices):
+    for v in range(graph.n_vertices):
         p += (1 if n_in[v] == 2 else -1) * outer[v]
     return p
 

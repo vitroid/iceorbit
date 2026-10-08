@@ -1,4 +1,4 @@
-"""Graph automorphism group of a cage and its action on edge orientations."""
+"""Automorphism group of a hydrogen-bond graph and its action on edge orientations."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .geometry import Cage
+from .geometry import HBGraph
 
 
 @dataclass(frozen=True)
@@ -47,7 +47,7 @@ def _bfs_order(nb: list[list[int]], root: int = 0) -> tuple[list[int], list[int]
                 order.append(w)
                 q.append(w)
     if len(order) != len(nb):
-        raise ValueError("cage graph is not connected")
+        raise ValueError("graph is not connected")
     return order, parent
 
 
@@ -114,24 +114,24 @@ def is_proper(sigma: list[int], nb: list[list[int]], chir: np.ndarray) -> bool:
         parity = _perm_parity([target.index(m) for m in mapped])
         agree += 1 if chir[sigma[v]] * parity == chir[v] else -1
     if abs(agree) != len(nb):
-        raise ValueError("automorphism preserves handedness at some vertices but not others; is the cage convex?")
+        raise ValueError("automorphism preserves handedness at some vertices but not others; is the structure convex?")
     return agree > 0
 
 
-def automorphism_group(cage: Cage) -> Group:
-    nb = cage.neighbors()
-    chir = _local_chirality(cage.coords, nb)
+def automorphism_group(graph: HBGraph) -> Group:
+    nb = graph.neighbors()
+    chir = _local_chirality(graph.coords, nb)
     perms = vertex_automorphisms(nb)
 
-    edge_index = {(int(u), int(v)): e for e, (u, v) in enumerate(cage.edges)}
-    n_e = cage.n_edges
+    edge_index = {(int(u), int(v)): e for e, (u, v) in enumerate(graph.edges)}
+    n_e = graph.n_edges
     edge_perm = np.empty((len(perms), n_e), dtype=np.int64)
     flip = np.zeros(len(perms), dtype=np.uint64)
     proper = np.empty(len(perms), dtype=bool)
     for g, sigma in enumerate(perms):
         proper[g] = is_proper(sigma, nb, chir)
         mask = 0
-        for e, (u, v) in enumerate(cage.edges):
+        for e, (u, v) in enumerate(graph.edges):
             a, b = sigma[u], sigma[v]
             e2 = edge_index[(min(a, b), max(a, b))]
             edge_perm[g, e] = e2
